@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenSearch 日志管理系统</title>
+    <style>
+        :root {
+            --primary-color: #1890ff;
+            --secondary-color: #f0f2f5;
+            --border-color: #d9d9d9;
+            --text-color: #333;
+            --success-color: #52c41a;
+            --warning-color: #faad14;
+            --error-color: #ff4d4f;
+            --info-color: #1890ff;
+            --dark-bg: #2c3e50;
+            --light-bg: #ffffff;
+            --sidebar-width: 300px;
+            --header-height: 60px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--secondary-color);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-color), #0050b3);
+            color: white;
+            padding: 0 20px;
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+
+        header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--light-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .sidebar h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .search-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 14px;
+            color: #555;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background-color: #40a9ff;
+        }
+
+        .btn-block {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .btn-secondary {
+            background-color: #d9d9d9;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background-color: #bfbfbf;
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+        }
+
+        .btn-success:hover {
+            background-color: #73d13d;
+        }
+
+        .logs-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--light-bg);
+            overflow: hidden;
+        }
+
+        .logs-header {
+            padding: 15px 20px;
+            background-color: var(--light-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logs-count {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .logs-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .logs-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .log-entry {
+            padding: 2px 8px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.3;
+            /* 减小行高，让日志更紧凑 */
+        }
+
+        .log-entry:hover {
+            background-color: #f5f5f5;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1px;
+            font-size: 12px;
+        }
+
+        .log-timestamp {
+            color: #888;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .log-metadata {
+            color: #888;
+        }
+
+        .json-btn {
+            background-color: #1890ff;
+            color: white;
+            border: none;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .json-btn:hover {
+            background-color: #40a9ff;
+        }
+
+        .log-content {
+            /* white-space: pre-wrap; */
+            word-break: break-word;
+            padding: 1px 4px;
+            border-radius: 4px;
+            background-color: #fafafa;
+            border-left: 3px solid var(--primary-color);
+            margin-top: 0;
+            overflow-x: auto;
+            font-family: 'Menlo', 'Monaco', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.3;
+            /* 减小行高 */
+        }
+
+        .log-content p {
+            margin: 0;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.3;
+            /* 减小行高 */
+        }
+
+        .log-level-info {
+            border-left-color: var(--info-color);
+        }
+
+        .log-level-warning {
+            border-left-color: var(--warning-color);
+        }
+
+        .log-level-error {
+            border-left-color: var(--error-color);
+        }
+
+        .log-level-debug {
+            border-left-color: #999;
+        }
+
+        /* 搜索词高亮 */
+        .highlight {
+            background-color: #ffeb3b;
+            padding: 1px 2px;
+            border-radius: 2px;
+        }
+
+        /* MyBatis 日志折叠样式 */
+        .mybatis-container {
+            border: 1px solid #e0e0e0;
+            border-radius: 3px;
+            margin: 0;
+            background-color: #f9f9f9;
+            overflow: hidden;
+        }
+
+        .mybatis-header {
+            padding: 2px 6px;
+            background-color: #f0f0f0;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #0066cc;
+            font-weight: 500;
+            user-select: none;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .mybatis-header-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .mybatis-header:hover {
+            background-color: #e8e8e8;
+        }
+
+        .mybatis-toggle {
+            font-size: 9px;
+            color: #999;
+            margin-left: 5px;
+        }
+
+        .mybatis-content {
+            padding: 3px 6px;
+            display: none;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .mybatis-content.show {
+            display: block;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: #888;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid var(--primary-color);
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #ddd;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+        }
+
+        #customTimeRange {
+            display: none;
+        }
+
+        .export-options {
+            display: flex;
+            gap: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .export-options {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>OpenSearch 日志管理系统</h1>
+        </header>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <h2>筛选条件</h2>
+                <form id="searchForm" class="search-form">
+                    <div class="form-group">
+                        <label for="indexPattern">索引模式</label>
+                        <input type="text" id="indexPattern" value="kube-*" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="appName">应用名称</label>
+                        <input type="text" id="appName" value="lab-service-cloud">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="searchTerm">搜索关键词</label>
+                        <input type="text" id="searchTerm" placeholder="输入要搜索的日志内容">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="timeRange">时间范围</label>
+                        <select id="timeRange">
+                            <option value="1h">最近1小时</option>
+                            <option value="6h">最近6小时</option>
+                            <option value="12h" selected>最近12小时</option>
+                            <option value="24h">最近24小时</option>
+                            <option value="custom">自定义</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="customTimeRange">
+                        <label for="startTime">开始时间</label>
+                        <input type="datetime-local" id="startTime">
+                        <label for="endTime">结束时间</label>
+                        <input type="datetime-local" id="endTime">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="logType">日志类型</label>
+                        <select id="logType">
+                            <option value="all">全部</option>
+                            <option value="mybatis">MyBatis日志</option>
+                            <option value="application" selected>应用日志(排除MyBatis)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="maxResults">最大结果数</label>
+                        <select id="maxResults">
+                            <option value="10">10</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                            <option value="500">500</option>
+                            <option value="1000">1000</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn-block">搜索日志</button>
+                </form>
+
+                <div style="margin-top: 30px;">
+                    <h2>导出选项</h2>
+                    <div class="export-options">
+                        <button id="exportTxtBtn" class="btn-secondary">导出为TXT</button>
+                        <button id="exportJsonBtn" class="btn-secondary">导出为JSON</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="logs-container">
+                <div class="logs-header">
+                    <div class="logs-count">日志记录 (<span id="logCount">0</span>)</div>
+                    <div class="logs-actions">
+                        <button id="refreshBtn">刷新</button>
+                    </div>
+                </div>
+
+                <div class="logs-list" id="logsList">
+                    <div class="empty-state">
+                        <div style="font-size: 48px; margin-bottom: 15px;">📝</div>
+                        <p>请输入筛选条件并点击"搜索日志"按钮查看结果</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量存储当前日志数据
+        let currentLogs = [];
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function () {
+            // 时间范围选择事件
+            const timeRangeSelect = document.getElementById('timeRange');
+            const customTimeRange = document.getElementById('customTimeRange');
+
+            timeRangeSelect.addEventListener('change', function () {
+                if (this.value === 'custom') {
+                    customTimeRange.style.display = 'block';
+                } else {
+                    customTimeRange.style.display = 'none';
+                }
+            });
+
+            // 搜索表单提交事件
+            const searchForm = document.getElementById('searchForm');
+            searchForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                searchLogs();
+            });
+
+            // 导出按钮事件
+            const exportTxtBtn = document.getElementById('exportTxtBtn');
+            const exportJsonBtn = document.getElementById('exportJsonBtn');
+
+            exportTxtBtn.addEventListener('click', function () {
+                exportLogs('txt');
+            });
+
+            exportJsonBtn.addEventListener('click', function () {
+                exportLogs('json');
+            });
+
+            // 刷新按钮事件
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.addEventListener('click', searchLogs);
+
+            // 页面加载时自动搜索一次
+            // searchLogs();
+        });
+
+        // 搜索日志函数
+        async function searchLogs() {
+            const logsList = document.getElementById('logsList');
+            const logCount = document.getElementById('logCount');
+
+            // 显示加载状态
+            logsList.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>正在搜索日志...</p>
+                </div>
+            `;
+
+            try {
+                // 获取表单数据
+                const formData = {
+                    indexPattern: document.getElementById('indexPattern').value,
+                    appName: document.getElementById('appName').value,
+                    searchTerm: document.getElementById('searchTerm').value,
+                    timeRange: document.getElementById('timeRange').value,
+                    maxResults: document.getElementById('maxResults').value,
+                    logType: document.getElementById('logType').value
+                };
+
+                // 如果是自定义时间范围
+                if (formData.timeRange === 'custom') {
+                    formData.startTime = document.getElementById('startTime').value;
+                    formData.endTime = document.getElementById('endTime').value;
+                }
+
+                // 发送请求到后端API
+                const response = await fetch('/api/search-logs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`搜索失败: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                // 保存当前日志数据到全局变量
+                currentLogs = data.hits || [];
+
+                // 更新日志计数
+                logCount.textContent = currentLogs.length;
+
+                // 渲染日志列表
+                if (currentLogs.length > 0) {
+                    renderLogs(currentLogs);
+                    // 添加 MyBatis 日志折叠事件监听器
+                    addMyBatisCollapseListeners();
+                } else {
+                    logsList.innerHTML = `
+                        <div class="empty-state">
+                            <div style="font-size: 48px; margin-bottom: 15px;">🔍</div>
+                            <p>没有找到匹配的日志记录</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('搜索日志时出错:', error);
+                logsList.innerHTML = `
+                    <div class="empty-state">
+                        <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+                        <p>搜索失败: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 添加 MyBatis 日志折叠事件监听器
+        function addMyBatisCollapseListeners() {
+            document.querySelectorAll('.mybatis-header').forEach(header => {
+                header.addEventListener('click', function () {
+                    const content = this.nextElementSibling;
+                    content.classList.toggle('show');
+                    const toggle = this.querySelector('.mybatis-toggle');
+                    toggle.textContent = content.classList.contains('show') ? '▲' : '▼';
+                });
+            });
+        }
+
+        // 渲染日志列表
+        function renderLogs(logs) {
+            const logsList = document.getElementById('logsList');
+            let html = '';
+
+            logs.forEach((log, index) => {
+                const timestamp = log._source['@timestamp'] || '未知时间';
+                const logContent = log._source.log || '';
+                const namespace = log._source.kubernetes?.namespace || '';
+                const pod = log._source.kubernetes?.pod?.name || '';
+
+                // 确定日志级别（根据内容简单判断）
+                let logLevelClass = '';
+                if (logContent.toLowerCase().includes('error') || logContent.toLowerCase().includes('exception')) {
+                    logLevelClass = 'log-level-error';
+                } else if (logContent.toLowerCase().includes('warn')) {
+                    logLevelClass = 'log-level-warning';
+                } else if (logContent.toLowerCase().includes('debug')) {
+                    logLevelClass = 'log-level-debug';
+                } else {
+                    logLevelClass = 'log-level-info';
+                }
+
+                // 格式化日志内容
+                const formattedContent = formatLogContent(logContent);
+
+                html += `
+                    <div class="log-entry" data-log-index="${index}">
+                        <div class="log-header">
+                            <div class="log-timestamp">
+                                ${formatTimestamp(timestamp)}
+                                <button class="json-btn" onclick="showLogAsJson(${index})">JSON</button>
+                            </div>
+                            <div class="log-metadata">${namespace}/${pod}</div>
+                        </div>
+                        <div class="log-content ${logLevelClass}">${formattedContent}</div>
+                    </div>
+                `;
+            });
+
+            logsList.innerHTML = html;
+        }
+
+        // 提取并显示日志中的键值对为 JSON 格式
+        function showLogAsJson(index) {
+            if (!currentLogs || !currentLogs[index]) {
+                alert('无法获取日志数据');
+                return;
+            }
+
+            const log = currentLogs[index];
+            const logContent = log._source.log || '';
+
+            // 尝试提取键值对部分并转换为 JSON
+            const jsonData = extractKeyValuePairs(logContent);
+
+            // 创建模态框显示 JSON
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0, 0, 0, 0.5);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            `;
+
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                max-width: 85%;
+                max-height: 85%;
+                overflow: auto;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            `;
+
+            const title = document.createElement('h3');
+            title.textContent = jsonData.success ? `JSON 格式数据 (索引: ${index})` : `原始日志 (索引: ${index})`;
+            title.style.cssText = 'margin: 0 0 15px 0; color: #333;';
+
+            const logDiv = document.createElement('div');
+            logDiv.style.cssText = `
+                background-color: #f5f5f5;
+                padding: 15px;
+                border-radius: 4px;
+                overflow-x: auto;
+                font-family: 'Monaco', 'Menlo', monospace;
+                font-size: 13px;
+                line-height: 1.6;
+                margin: 0 0 15px 0;
+                white-space: pre-wrap;
+                word-break: break-word;
+            `;
+
+            if (jsonData.success) {
+                // 显示格式化的 JSON
+                logDiv.innerHTML = highlightJson(jsonData.json);
+            } else {
+                // 如果提取失败，显示原始内容
+                logDiv.textContent = logContent;
+            }
+
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
+
+            const copyBtn = document.createElement('button');
+            copyBtn.textContent = jsonData.success ? '复制 JSON' : '复制原始内容';
+            copyBtn.style.cssText = `
+                background-color: #1890ff;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            copyBtn.onclick = () => {
+                const copyText = jsonData.success ? jsonData.json : logContent;
+                navigator.clipboard.writeText(copyText).then(() => {
+                    copyBtn.textContent = '已复制!';
+                    setTimeout(() => copyBtn.textContent = jsonData.success ? '复制 JSON' : '复制原始内容', 2000);
+                });
+            };
+
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '关闭';
+            closeBtn.style.cssText = `
+                background-color: #d9d9d9;
+                color: #333;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            closeBtn.onclick = () => document.body.removeChild(modal);
+
+            buttonContainer.appendChild(copyBtn);
+            buttonContainer.appendChild(closeBtn);
+
+            content.appendChild(title);
+            content.appendChild(logDiv);
+            content.appendChild(buttonContainer);
+            modal.appendChild(content);
+
+            // 点击背景关闭
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            };
+
+            document.body.appendChild(modal);
+        }
+
+        // 递归解析 JSON 字符串
+        function recursiveParseJson(obj) {
+            if (typeof obj === 'string') {
+                // 尝试解析字符串为 JSON
+                try {
+                    const parsed = JSON.parse(obj);
+                    // 递归解析
+                    return recursiveParseJson(parsed);
+                } catch (e) {
+                    // 不是 JSON，返回原值
+                    return obj;
+                }
+            } else if (Array.isArray(obj)) {
+                // 递归处理数组
+                return obj.map(item => recursiveParseJson(item));
+            } else if (obj !== null && typeof obj === 'object') {
+                // 递归处理对象
+                const result = {};
+                for (const key in obj) {
+                    result[key] = recursiveParseJson(obj[key]);
+                }
+                return result;
+            }
+            return obj;
+        }
+
+        // 解析 Java 对象格式为 JSON（如：TestLabNote(key=value, key2=value2)）
+        function parseJavaObjectToJson(content) {
+            try {
+                // 查找最后一个 "] - " 之后的内容
+                const match = content.match(/\]\s*-\s*(.+)$/);
+                if (!match) return null;
+
+                const kvPart = match[1].trim();
+
+                // 检查是否包含 Java 对象格式的特征
+                if (!kvPart.includes('(') || !kvPart.includes('=')) {
+                    return null;
+                }
+
+                const obj = {};
+
+                // 匹配简单的 key: value 格式
+                const simpleKvRegex = /(\w+):\s*([^,\[]+?)(?=,\s*\w+:|$)/g;
+                let match1;
+                while ((match1 = simpleKvRegex.exec(kvPart)) !== null) {
+                    const key = match1[1];
+                    let value = match1[2].trim();
+
+                    // 处理值类型
+                    if (value === 'null') {
+                        obj[key] = null;
+                    } else if (value === 'true') {
+                        obj[key] = true;
+                    } else if (value === 'false') {
+                        obj[key] = false;
+                    } else if (/^\d+$/.test(value)) {
+                        obj[key] = parseInt(value);
+                    } else if (/^\d+\.\d+$/.test(value)) {
+                        obj[key] = parseFloat(value);
+                    } else {
+                        obj[key] = value;
+                    }
+                }
+
+                // 匹配数组格式 key: [...]
+                const arrayRegex = /(\w+):\s*(\[[\s\S]*?\](?=,?\s*(?:\w+:|$)))/g;
+                let match2;
+                while ((match2 = arrayRegex.exec(kvPart)) !== null) {
+                    const key = match2[1];
+                    const arrayStr = match2[2];
+
+                    // 解析数组中的 Java 对象
+                    const items = [];
+
+                    // 匹配 ClassName(...) 格式
+                    const objectRegex = /(\w+)\((.*?)\)(?=,\s*\w+\(|])/g;
+                    let objMatch;
+
+                    let lastIndex = 0;
+                    while ((objMatch = objectRegex.exec(arrayStr)) !== null) {
+                        const className = objMatch[1];
+                        const propsStr = objMatch[2];
+
+                        const item = { _type: className };
+
+                        // 解析对象属性 key=value
+                        const propRegex = /(\w+)=((?:[^,()]+|\([^)]*\))+?)(?=,\s*\w+=|$)/g;
+                        let propMatch;
+
+                        while ((propMatch = propRegex.exec(propsStr)) !== null) {
+                            let propKey = propMatch[1];
+                            let propValue = propMatch[2].trim();
+
+                            // 处理嵌套对象 super=ClassName(...)
+                            if (propValue.includes('(') && propValue.includes(')')) {
+                                const nestedMatch = propValue.match(/(\w+)\((.*)\)/);
+                                if (nestedMatch) {
+                                    const nestedObj = { _type: nestedMatch[1] };
+                                    const nestedProps = nestedMatch[2];
+                                    const nestedPropRegex = /(\w+)=([^,]+)/g;
+                                    let nestedPropMatch;
+                                    while ((nestedPropMatch = nestedPropRegex.exec(nestedProps)) !== null) {
+                                        let nk = nestedPropMatch[1];
+                                        let nv = nestedPropMatch[2].trim();
+                                        if (nv === 'null') nestedObj[nk] = null;
+                                        else if (nv === 'true') nestedObj[nk] = true;
+                                        else if (nv === 'false') nestedObj[nk] = false;
+                                        else if (/^\d+$/.test(nv)) nestedObj[nk] = parseInt(nv);
+                                        else nestedObj[nk] = nv;
+                                    }
+                                    item[propKey] = nestedObj;
+                                }
+                            } else {
+                                // 简单值
+                                if (propValue === 'null') {
+                                    item[propKey] = null;
+                                } else if (propValue === 'true') {
+                                    item[propKey] = true;
+                                } else if (propValue === 'false') {
+                                    item[propKey] = false;
+                                } else if (/^\d+$/.test(propValue)) {
+                                    item[propKey] = parseInt(propValue);
+                                } else if (/^\d+\.\d+$/.test(propValue)) {
+                                    item[propKey] = parseFloat(propValue);
+                                } else {
+                                    item[propKey] = propValue;
+                                }
+                            }
+                        }
+
+                        items.push(item);
+                        lastIndex = objMatch.index + objMatch[0].length;
+                    }
+
+                    if (items.length > 0) {
+                        obj[key] = items;
+                    }
+                }
+
+                if (Object.keys(obj).length > 0) {
+                    return obj;
+                }
+
+                return null;
+            } catch (error) {
+                console.error('Failed to parse Java object:', error);
+                return null;
+            }
+        }
+
+        // 提取日志中的 JSON 数据
+        function extractKeyValuePairs(logContent) {
+            try {
+                // 方法1：尝试直接解析整个内容为 JSON
+                try {
+                    const parsed = JSON.parse(logContent);
+                    const recursiveParsed = recursiveParseJson(parsed);
+                    const jsonString = JSON.stringify(recursiveParsed, null, 2);
+                    return { success: true, json: jsonString, obj: recursiveParsed };
+                } catch (e) {
+                    // 不是直接的 JSON，继续尝试其他方法
+                }
+
+                // 方法2：查找 JSON 对象（以 { 开头）
+                const jsonMatch = logContent.match(/\{[\s\S]*\}$/);
+                if (jsonMatch) {
+                    try {
+                        const parsed = JSON.parse(jsonMatch[0]);
+                        const recursiveParsed = recursiveParseJson(parsed);
+                        const jsonString = JSON.stringify(recursiveParsed, null, 2);
+                        return { success: true, json: jsonString, obj: recursiveParsed };
+                    } catch (e) {
+                        console.error('Failed to parse JSON:', e);
+                    }
+                }
+
+                // 方法3：查找最后一个 "] - " 或 "INFO" 等之后的内容
+                const patterns = [
+                    /\]\s*-\s*(\{[\s\S]*\})$/,  // ] - {...}
+                    /INFO\s+(\{[\s\S]*\})$/,     // INFO {...}
+                    /DEBUG\s+(\{[\s\S]*\})$/,    // DEBUG {...}
+                    /WARN\s+(\{[\s\S]*\})$/,     // WARN {...}
+                    /ERROR\s+(\{[\s\S]*\})$/     // ERROR {...}
+                ];
+
+                for (const pattern of patterns) {
+                    const match = logContent.match(pattern);
+                    if (match) {
+                        try {
+                            const parsed = JSON.parse(match[1]);
+                            const recursiveParsed = recursiveParseJson(parsed);
+                            const jsonString = JSON.stringify(recursiveParsed, null, 2);
+                            return { success: true, json: jsonString, obj: recursiveParsed };
+                        } catch (e) {
+                            continue;
+                        }
+                    }
+                }
+
+                // 方法4：尝试解析 Java 对象格式
+                const javaObj = parseJavaObjectToJson(logContent);
+                if (javaObj) {
+                    const jsonString = JSON.stringify(javaObj, null, 2);
+                    return { success: true, json: jsonString, obj: javaObj };
+                }
+
+                return { success: false };
+            } catch (error) {
+                console.error('Failed to extract JSON:', error);
+                return { success: false };
+            }
+        }
+
+        // 高亮 JSON 语法
+        function highlightJson(jsonString) {
+            let html = escapeHtml(jsonString);
+
+            // 使用占位符避免重复匹配
+            const placeholder = '\u0000PLACEHOLDER\u0000';
+            let placeholders = [];
+
+            // 1. 高亮键名和冒号（"key": ）- 紫红色键名
+            html = html.replace(/"([^"]+)"(\s*):/g, (match, key, space) => {
+                const index = placeholders.length;
+                placeholders.push(`<span style="color: #c41d7f; font-weight: 500;">"${key}"</span>${space}<span style="color: #8c8c8c;">:</span>`);
+                return `${placeholder}${index}${placeholder}`;
+            });
+
+            // 2. 高亮字符串值（空格"value"）- 绿色
+            html = html.replace(/(\s)"([^"]*)"/g, (match, space, value) => {
+                const index = placeholders.length;
+                placeholders.push(`${space}<span style="color: #52c41a;">"${value}"</span>`);
+                return `${placeholder}${index}${placeholder}`;
+            });
+
+            // 3. 高亮 null - 红色
+            html = html.replace(/(\s)(null)\b/g, (match, space, value) => {
+                const index = placeholders.length;
+                placeholders.push(`${space}<span style="color: #ff4d4f; font-weight: 500;">${value}</span>`);
+                return `${placeholder}${index}${placeholder}`;
+            });
+
+            // 4. 高亮 true, false - 蓝色
+            html = html.replace(/(\s)(true|false)\b/g, (match, space, value) => {
+                const index = placeholders.length;
+                placeholders.push(`${space}<span style="color: #1890ff; font-weight: 500;">${value}</span>`);
+                return `${placeholder}${index}${placeholder}`;
+            });
+
+            // 5. 高亮数字 - 蓝色
+            html = html.replace(/(\s)(-?\d+\.?\d*)\b/g, (match, space, value) => {
+                const index = placeholders.length;
+                placeholders.push(`${space}<span style="color: #1890ff; font-weight: 500;">${value}</span>`);
+                return `${placeholder}${index}${placeholder}`;
+            });
+
+            // 6. 高亮括号 - 深灰色
+            html = html.replace(/([{}[\]])/g, (match) => {
+                const index = placeholders.length;
+                placeholders.push(`<span style="color: #595959; font-weight: 500;">${match}</span>`);
+                return `${placeholder}${index}${placeholder}`;
+            });
+
+            // 7. 高亮逗号 - 浅灰色
+            html = html.replace(/(,)/g, (match) => {
+                const index = placeholders.length;
+                placeholders.push(`<span style="color: #8c8c8c;">${match}</span>`);
+                return `${placeholder}${index}${placeholder}`;
+            });
+
+            // 还原所有占位符
+            for (let i = 0; i < placeholders.length; i++) {
+                html = html.replace(`${placeholder}${i}${placeholder}`, placeholders[i]);
+            }
+
+            return html;
+        }
+
+
+        // 格式化日志内容
+        function formatLogContent(content) {
+            // 检查是否是 MyBatis 日志
+            const isMyBatisLog = content.includes('Preparing:') ||
+                content.includes('Parameters:') ||
+                content.includes('org.apache.ibatis') ||
+                content.includes('==>  Preparing:') ||
+                content.includes('==> Parameters:');
+
+            // 如果是 MyBatis 日志，使用折叠容器
+            if (isMyBatisLog) {
+                return formatMyBatisLog(content);
+            }
+
+            // 转义HTML
+            let escapedContent = escapeHtml(content);
+
+            // 获取搜索词
+            const searchTerm = document.getElementById('searchTerm').value;
+
+            // 对搜索词进行高亮
+            if (searchTerm) {
+                escapedContent = highlightSearchTerm(escapedContent, searchTerm);
+            }
+
+            // 处理JSON日志
+            escapedContent = formatJsonLogs(escapedContent);
+
+            return escapedContent;
+        }
+
+        // 高亮 MyBatis 日志中的 SQL 语句
+        function highlightMyBatisSql(content) {
+            // 先转义 HTML
+            let result = escapeHtml(content);
+
+            // 使用占位符避免重复匹配
+            const placeholder = '\u0000SQLPLACEHOLDER\u0000';
+            let sqlStatements = [];
+
+            // 规则：找到 "Preparing:" 后面的内容直到行尾，这就是 SQL 语句
+            result = result.replace(/(.*?Preparing:\s*)(.+?)(?=\n|$)/g, (match, prefix, sql) => {
+                const index = sqlStatements.length;
+                // SQL 语句用背景色和边框高亮显示
+                sqlStatements.push(`${prefix}<span style="background-color: #e6f7ff; color: #0050b3; padding: 2px 4px; border-radius: 3px; border-left: 3px solid #1890ff; display: inline-block; font-weight: 500;">${sql}</span>`);
+                return `${placeholder}${index}${placeholder}`;
+            });
+
+            // 还原所有占位符
+            for (let i = 0; i < sqlStatements.length; i++) {
+                result = result.replace(`${placeholder}${i}${placeholder}`, sqlStatements[i]);
+            }
+
+            return result;
+        }
+
+        // 格式化 MyBatis 日志为折叠容器
+        function formatMyBatisLog(content) {
+            // 先高亮 SQL 语句
+            let processedContent = highlightMyBatisSql(content);
+
+            // 获取搜索词
+            const searchTerm = document.getElementById('searchTerm').value;
+
+            // 对搜索词进行高亮
+            if (searchTerm) {
+                processedContent = highlightSearchTerm(processedContent, searchTerm);
+            }
+
+            // 提取第一行作为标题（显示完整的一行）
+            const lines = content.split('\n');
+            const title = escapeHtml(lines[0]);
+
+            return `
+                <div class="mybatis-container">
+                    <div class="mybatis-header">
+                        <span class="mybatis-header-text">MyBatis SQL - ${title}</span>
+                        <span class="mybatis-toggle">▼</span>
+                    </div>
+                    <div class="mybatis-content">
+                        ${processedContent}
+                    </div>
+                </div>
+            `;
+        }
+
+
+        // 搜索词高亮
+        function highlightSearchTerm(content, searchTerm) {
+            if (!searchTerm) return content;
+
+            // 转义特殊字符
+            const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${escapedTerm})`, 'gi');
+
+            return content.replace(regex, '<span class="highlight">$1</span>');
+        }
+
+        // 格式化JSON日志（简化版，不使用折叠容器）
+        function formatJsonLogs(content) {
+            // 直接返回内容，不做特殊处理
+            return content;
+        }
+
+        // 导出日志函数（导出当前页面显示的日志）
+        function exportLogs(format) {
+            try {
+                // 检查是否有日志数据
+                if (!currentLogs || currentLogs.length === 0) {
+                    alert('没有可导出的日志数据，请先搜索日志！');
+                    return;
+                }
+
+                let content = '';
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+                if (format === 'txt') {
+                    // TXT格式：纯文本
+                    currentLogs.forEach((log, index) => {
+                        const logTimestamp = log._source['@timestamp'] || '未知时间';
+                        const logContent = log._source.log || '';
+                        const namespace = log._source.kubernetes?.namespace || '';
+                        const pod = log._source.kubernetes?.pod?.name || '';
+
+                        content += `========== 日志 ${index + 1} ==========\n`;
+                        content += `时间: ${logTimestamp}\n`;
+                        content += `命名空间/Pod: ${namespace}/${pod}\n`;
+                        content += `内容:\n${logContent}\n\n`;
+                    });
+                } else if (format === 'json') {
+                    // JSON格式：保持原始结构
+                    content = JSON.stringify(currentLogs, null, 2);
+                }
+
+                // 创建 Blob 并下载
+                const blob = new Blob([content], {
+                    type: format === 'json' ? 'application/json' : 'text/plain;charset=utf-8;'
+                });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `logs_${timestamp}.${format}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                console.log(`成功导出 ${currentLogs.length} 条日志`);
+            } catch (error) {
+                console.error('导出日志时出错:', error);
+                alert(`导出失败: ${error.message}`);
+            }
+        }
+
+        // 格式化时间戳
+        function formatTimestamp(timestamp) {
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleString('zh-CN');
+            } catch (e) {
+                return timestamp;
+            }
+        }
+
+        // HTML转义函数
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+
+</html>
