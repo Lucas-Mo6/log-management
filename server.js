@@ -1,10 +1,11 @@
 const express = require('express');
 const { Client } = require('@opensearch-project/opensearch');
 const path = require('path');
-const config = require('./config');
+const env = process.env.NODE_ENV || 'development';
+const config = require('./config' + (env === 'production' ? '.production' : ''));
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || (config.server && config.server.port) || 3000;
 
 // 中间件
 app.use(express.json());
@@ -387,6 +388,8 @@ app.get('/', (req, res) => {
 });
 
 // 启动服务器
-app.listen(PORT, () => {
-    console.log(`日志管理系统服务器运行在端口 ${PORT}`);
+const HOST = process.env.HOST || (config.server && config.server.host) || '0.0.0.0';
+app.listen(PORT, HOST, () => {
+    console.log(`日志管理系统服务器运行在 http://${HOST}:${PORT}`);
+    console.log(`环境: ${env}`);
 });
